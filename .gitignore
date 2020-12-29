@@ -1,0 +1,7 @@
+.DS_Store
+
+node_modules/*
+pdf2json
+
+*.pdf
+*.json
