@@ -13,16 +13,29 @@ const { extractText, extractTextStyle } = require('./extractors')
 // The strcuture of the risk chunk is as follow:
 //
 // {
-//   title: 'some title',
+//   ref: '',
+//   ctrl_name: '',
+//   score_status: '',
+//   start_pos: '',
+//   end_pos: '',
 //   text_chunks: [textObj, textObj]
 // }
 //
 // The structure of text obj is provided by the "pdf2json"
 //
+// We can actually use regex subpattern to grab content within two titles.
+// For example:
+//
+//   Description:
+//
 function parseRiskText(textObj) {
-  const { text_chunks: textChunks } = textObj
+  const {
+    ref,
+    ctrl_name: ctrlName,
+    text_chunks: textChunks,
+  } = textObj
 
-  const apInfo = extractProfileApplicability(textObj)
+  const apInfo = extractProfileApplicability(textChunks)
 
   // The start position of "Description" is the end position of "Profile Applicability" plus 1.
   const descTextChunks = textChunks.slice(apInfo.end_pos+1)
@@ -36,21 +49,41 @@ function parseRiskText(textObj) {
   const auditChunks = rationaleChunks.slice(rationaleInfo.rel_end_pos+1)
   const auditInfo = extractAuditInfo(auditChunks)
 
+  //console.log('DEBUG spot 1 ', auditInfo)
+
   // The start of "Remediation" is the end position of "Audit".
   const remediationChunks = auditChunks.slice(auditInfo.rel_end_pos+1)
   const remediationInfo = extractRemediation(remediationChunks)
+
+  // The start of "Impact" is the end position of "Remediation".
+  const impactChunks = remediationChunks.slice(remediationInfo.rel_end_pos+1)
+  const impactInfo = extractImpact(impactChunks)
+
+
+  // Now we have all information, we can start return all information.
+  return {
+    control_ref: ref,
+    control_name: ctrlName,
+    pass_value: apInfo.pass_val,
+    control_description: descInfo.content,
+    command: auditInfo.command,
+    remediation: remediationInfo.content,
+    impact: impactInfo.content,
+  }
 }
 
 const PROFILE_APPLICABILITY_REGEX = /^Profile%20Applicability%3A$/
 const DESCRIPTION_REGEX = /^Description%3A$/
 const PASS_SCORE_REGEX = /^Level%20(\d+)$/
-const RATIONALE_REGEX = /^Rationale%3A$/
+const AUDIT_REGEX = /^Audit%3A$/
+const REMEDIATION_REGEX = /^R?emediation?(%3A)?$/
+const IMPACT_REGEX = /^Impact%3A$/
+const CIS_CONTROL_REGEX = /^CIS(%20Controls%3A)?$/
 
-function extractProfileApplicability(textObj) {
-  const {
-    text_chunks: textChunks,
-  } = textObj
+const SEGMENT_DELIMITER_REGEX = /^(Profile%20Applicability%3A|Description%3A|Rationale%3A|Audit%3A|Remediation%3A|Impact%3A|CIS%20Controls%3A)$/
+const COLON_DELIMITER_REGEX = /^.*%3A$/
 
+function extractProfileApplicability(textChunks) {
   let startPos = 0
   let endPos = 0
 
@@ -66,11 +99,15 @@ function extractProfileApplicability(textObj) {
       continue
     }
 
-    // Record the ending position.
-    const isDesc = DESCRIPTION_REGEX.test(extractText(textChunks[i]))
+  }
 
-    if (isDesc) {
-      endPos = i - 1
+
+  for (let k = startPos+1; k < textChunks.length; k++) {
+    // Record the ending position.
+    const isDeliminator = COLON_DELIMITER_REGEX.test(extractText(textChunks[k+1]))
+
+    if (isDeliminator) {
+      endPos = k
 
       break
     }
@@ -106,11 +143,11 @@ function extractProfileApplicability(textObj) {
 }
 
 function extractDescInfo(textChunks) {
-  //Find text range before "Rationale:"
+  // Find text range before "Rationale:"
   let endPos = 0
-
-  for (let i = 0; i < textChunks.length; i++) {
-    const isRationale = RATIONALE_REGEX.test(extractText(textChunks[i]))
+  //console.log('extractDescInfo spot 1', extractText(textChunks[0]))
+  for (let i = 1; i < textChunks.length; i++) {
+    const isRationale = SEGMENT_DELIMITER_REGEX.test(extractText(textChunks[i]))
 
     if (isRationale) {
       endPos = i - 1
@@ -129,7 +166,6 @@ function extractDescInfo(textChunks) {
   }
 }
 
-const AUDIT_REGEX = /^Audit%3A$/
 function extractRationale(textChunks) {
   let endPos = 0
 
@@ -149,12 +185,14 @@ function extractRationale(textChunks) {
   }
 }
 
-const REMEDIATION_REGEX = /^Remediation%3A$/
 function extractAuditInfo(textChunks) {
   let endPos = 0
 
-  for (let i = 0; i < textChunks.length; i++) {
+  console.log('extractAuditInfo spot 1', extractText(textChunks[0]))
+  for (let i = 1; i < textChunks.length; i++) {
     if (REMEDIATION_REGEX.test(extractText(textChunks[i]))) {
+
+      console.log('extractAuditInfo spot 2', i)
       endPos = i - 1
 
       break
@@ -174,20 +212,73 @@ function extractAuditInfo(textChunks) {
 function parseCommandFromAuditTexts(auditChunks) {
   // The command are wrapped in a code block with
   // fontFaceID: 3 and fontSize: 12.96. We can filter
-  // out commands by comparing these values.
-  const commandChunks = auditChunks.filter(chunk => {
-    const [fontFaceID, fontSize] = extractTextStyle(chunk)
+  // out commands by comparing against these values.
+  //
+  // Note, a audit region may contain multiple code blocks.
+  // We assume that the first block is the command code block.
 
-    return fontFaceID === 3 && fontSize === 12.96
-  })
+  const commandCodeTexts = []
+  let foundAt = null
 
-  return composeContentFromTextChunks(commandChunks)
+  for (let i = 0; i < auditChunks.length; i++) {
+    const [fontFaceID, fontSize] = extractTextStyle(auditChunks[i])
+
+    if (fontFaceID === 3 && fontSize === 12.96) {
+      if (foundAt === null || i - foundAt === 1) {
+        commandCodeTexts.push(auditChunks[i])
+
+        foundAt = i
+
+        continue
+      }
+
+      if (i - foundAt > 1) {
+        break
+      }
+    }
+  }
+
+  return composeContentFromTextChunks(commandCodeTexts)
 }
 
-const IMPACT_REGEX = /^Impact%3A$/
-function extractRemediation() {
+function extractRemediation(textChunks) {
+  let endPos = 0
 
+  for (let i = 0; i < textChunks.length; i++) {
+    if (IMPACT_REGEX.test(extractText(textChunks[i]))) {
+      endPos = i - 1
 
+      break
+    }
+  }
+
+  const remediationChunk = textChunks.slice(1, endPos + 1)
+  const content = composeContentFromTextChunks(remediationChunk)
+
+  return {
+    rel_end_pos: endPos,
+    content,
+  }
+}
+
+function extractImpact(textChunks) {
+  let endPos = 0
+
+  for (let i = 0; i < textChunks.length; i++) {
+    if (CIS_CONTROL_REGEX.test(extractText(textChunks[i]))) {
+      endPos = i - 1
+
+      break;
+    }
+  }
+
+  const impactChunks = textChunks.slice(1, endPos+1)
+  const content = composeContentFromTextChunks(impactChunks)
+
+  return {
+    rel_end_pos: endPos,
+    content,
+  }
 }
 
 function composeContentFromTextChunks (textChunks) {

@@ -4,7 +4,11 @@ const fs = require('fs');
 const PDFParser = require('pdf2json');
 
 //const fileName = './CIS_Apple_macOS_10.15_Benchmark_v1.0.0.pdf'
-const fileName = 'CIS_Apple_macOS_13_23.pdf';
+//const fileName = 'CIS_Apple_macOS_13_23.pdf';
+const fileName = './CIS_Apple_macOS_risk_only.pdf';
+
+//const targetFileName = './macOS_master.json'
+const targetFileName = './macOS_risk_only.json'
 
 function StringifyStream(){
      stream.Transform.call(this);
@@ -25,7 +29,7 @@ let inputStream = fs.createReadStream(
       bufferSize: 64 * 1024,
     },
   );
-let outputStream = fs.createWriteStream('./macOS_partial.json');
+let outputStream = fs.createWriteStream(targetFileName);
 
 inputStream
   .pipe(new PDFParser())

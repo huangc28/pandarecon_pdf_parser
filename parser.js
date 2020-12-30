@@ -27,8 +27,6 @@
 //   }
 // }
 //
-//
-//
 const fs = require('fs')
 const path = require('path')
 const JSONStream = require('JSONStream')
@@ -36,7 +34,8 @@ const JSONStream = require('JSONStream')
 const riskRangeTags = require('./get_risk_range_tags')
 const parseRiskText = require('./parse_risk_text')
 
-const fileName = path.resolve(__dirname, './macOS_partial.json')
+//const fileName = path.resolve(__dirname, './macOS_partial.json')
+const fileName = path.resolve(__dirname, './macOS_risk_only.json')
 
 const read = fileName => {
   const s = fs.createReadStream(fileName, { encoding: 'utf8' })
@@ -50,27 +49,27 @@ const handleData = chunk => {
   const fullTexts = getTextElems(chunk.Pages)
   const tags = riskRangeTags(fullTexts)
 
-  // Retrieve text range for each tags.
-  const riskTextChunks = []
-  tags.forEach(tag => {
-    const chunk = {
-      title: tag.title,
-      text_chunks: fullTexts.slice(tag.start_pos, tag.end_pos + 1)
-    }
+  //const s = tags.find(tag => tag.ref === '3.5')
+  //const obj = parseRiskText(s)
 
-    riskTextChunks.push(chunk)
-  })
+  //console.log('res obj', obj)
 
-  // Now we can parse the information we want risk by risk.
-  //console.log(riskTextChunks[0].text_chunks[0])
-  const riskInfoObjs = riskTextChunks.map(chunk => parseRiskText(chunk))
+  const riskInfoObjs = tags.map(chunk => parseRiskText(chunk))
 
-  //console.log('riskInfoObjs', riskInfoObjs)
+  console.log('riskInfoObjs', riskInfoObjs)
+
+  //fs.writeFile('./data_seeder.json', JSON.stringify(riskInfoObjs) , err => {
+    //if (err) {
+        //throw err;
+    //}
+
+    //console.error("JSON data is saved.");
+  //})
 }
 
 const getTextElems = pages =>
   pages.reduce((prev, page) => {
-    if ('Texts' in page ) {
+    if ('Texts' in page) {
       return prev.concat(page.Texts)
     }
 
