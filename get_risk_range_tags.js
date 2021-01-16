@@ -5,75 +5,13 @@ const {
   extractText,
 } = require('./extractors')
 
-const composeContentFromTextChunks = require('./util')
+const { composeContentFromTextChunks } = require('./util')
 
 const isRiskTitle = textObj => {
   // determine if is text title via text style.
   const [fontFaceID, fontSize] = extractTextStyle(textObj)
 
   return fontFaceID === 2 && fontSize === 18.96
-}
-
-//const RISK_TITLE_REG = /^[0-9]+\.[0-9]+(\.[0-9]+)?.*\((Scored|Not Scored)\)$/
-//const RISK_TITLE_REG = /^[0-9]+\.[0-9]+(\.\d+\.\d)?.*\((Scored|Not%20Scored)\)?$/
-const RISK_TITLE_REG = /^[0-9]+\.[0-9]+(\.\d+\.\d)?(.*)$/
-const TITLE_COMPLETION_REG = /^.*\((Scored|Not%20Scored)\)$/
-
-const completeTitleFromTitleList = titleList => {
-  const newTitleList = []
-
-  const findCompletedLineToTitle = (titleList, startIndex) => {
-    console.log('spot 1', startIndex)
-    console.log('spot 2', titleList.length)
-    //console.log('spot 3', titleList[158])
-    if (!titleList[startIndex + 1]) {
-      return startIndex
-    }
-
-    if (TITLE_COMPLETION_REG.test(titleList[startIndex + 1].title)) {
-      return startIndex + 1
-    }
-
-    return findCompletedLineToTitle(titleList, startIndex + 1)
-  }
-
-  const setProperEndPosForTitleTag = titleList => {
-    let i = 0
-    while (i < titleList.length) {
-      if (titleList[i+1]) {
-        titleList[i].end_pos = titleList[i+1].start_pos - 1
-      }
-
-      i++
-    }
-
-    return titleList
-  }
-
-  let i = 0
-  while (i < titleList.length) {
-    if (RISK_TITLE_REG.test(titleList[i].title)) {
-      newTitleList.push(titleList[i])
-
-    }
-
-
-    i++
-    //else {
-      //const idxToCompleteTitle = findCompletedLineToTitle(titleList, i)
-      //const arrSlice = titleList.slice(i + 1, idxToCompleteTitle + 1)
-      //arrSlice.unshift(titleList[i])
-
-      //newTitleList.push({
-        //title: arrSlice.reduce((prev, curr) => prev += curr.title, ''),
-        //start_pos: titleList[i].start_pos,
-      //})
-
-      //i += (idxToCompleteTitle - i) + 1
-    //}
-  }
-
-  return setProperEndPosForTitleTag(newTitleList)
 }
 
 /**
@@ -94,18 +32,12 @@ const completeTitleFromTitleList = titleList => {
  */
 
 const RISK_TITLE_SEP_REG = /^(\d+\.\d+(\.\d+){0,2})(.*)\((Scored|Not%20Scored)\)$/
+
 function riskRangeTags(texts) {
   const titleChunks = []
 
-  texts.forEach((textObj, i) => {
+  texts.forEach(textObj => {
     if (isRiskTitle(textObj)) {
-      // Literature resides in text.R.T
-      //const title = extractText(textObj)
-
-      //titlePosTags.push({
-        //title,
-        //start_pos: i,
-      //})
       titleChunks.push(textObj)
     }
   })

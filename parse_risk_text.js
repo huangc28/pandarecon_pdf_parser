@@ -1,4 +1,8 @@
 const { extractText, extractTextStyle } = require('./extractors')
+const {
+  composeContentFromTextChunks,
+  removePDFPageText,
+} = require('./util')
 
 // This function extracts the information we need from risk chunk.
 // It analyzes the text chunks for each risk and try to parse the following
@@ -38,18 +42,18 @@ function parseRiskText(textObj) {
   const apInfo = extractProfileApplicability(textChunks)
 
   // The start position of "Description" is the end position of "Profile Applicability" plus 1.
-  const descTextChunks = textChunks.slice(apInfo.end_pos+1)
+  const descTextChunks = textChunks.slice(apInfo.end_pos + 1)
   const descInfo = extractDescInfo(descTextChunks)
 
   // The start of "Rationale" is the end position of "Description".
   const rationaleChunks = textChunks.slice(apInfo.end_pos+1 + descInfo.rel_end_pod+1)
   const rationaleInfo = extractRationale(rationaleChunks)
 
+  //console.log('DEBUG 31', rationaleInfo)
+
   // The start of "Audit" is the end position of "Rationale".
   const auditChunks = rationaleChunks.slice(rationaleInfo.rel_end_pos+1)
   const auditInfo = extractAuditInfo(auditChunks)
-
-  //console.log('DEBUG spot 1 ', auditInfo)
 
   // The start of "Remediation" is the end position of "Audit".
   const remediationChunks = auditChunks.slice(auditInfo.rel_end_pos+1)
@@ -63,18 +67,24 @@ function parseRiskText(textObj) {
   // Now we have all information, we can start return all information.
   return {
     control_ref: ref,
+    rationale: rationaleInfo.content,
     control_name: ctrlName,
-    pass_value: apInfo.pass_val,
     control_description: descInfo.content,
+    pass_value: apInfo.pass_val,
     command: auditInfo.command,
     remediation: remediationInfo.content,
     impact: impactInfo.content,
   }
 }
 
+const isSubTitle = textObj => {
+  const [fontFaceID, fontSize] = extractTextStyle(textObj)
+  return fontFaceID === 2 && fontSize === 16
+}
+
 const PROFILE_APPLICABILITY_REGEX = /^Profile%20Applicability%3A$/
 const DESCRIPTION_REGEX = /^Description%3A$/
-const PASS_SCORE_REGEX = /^Level%20(\d+)$/
+const PASS_SCORE_REGEX = /Level%20(\d+)$/
 const AUDIT_REGEX = /^Audit%3A$/
 const REMEDIATION_REGEX = /^R?emediation?(%3A)?$/
 const IMPACT_REGEX = /^Impact%3A$/
@@ -91,23 +101,23 @@ function extractProfileApplicability(textChunks) {
   // The range is in between "Profile Applicability" and "Description".
   for (let i = 0; i < textChunks.length; i++) {
     // Record the starting position.
-    const isPA = PROFILE_APPLICABILITY_REGEX.test(extractText(textChunks[i]))
+    const isDeliminator = COLON_DELIMITER_REGEX.test(extractText(textChunks[i]))
 
-    if (isPA) {
+    if (isDeliminator && isSubTitle(textChunks[i])) {
+      console.log('spot 1', extractText(textChunks[i]))
       startPos = i
 
-      continue
+      break
     }
-
   }
 
 
   for (let k = startPos+1; k < textChunks.length; k++) {
     // Record the ending position.
-    const isDeliminator = COLON_DELIMITER_REGEX.test(extractText(textChunks[k+1]))
+    const isDeliminator = COLON_DELIMITER_REGEX.test(extractText(textChunks[k]))
 
-    if (isDeliminator) {
-      endPos = k
+    if (isDeliminator && isSubTitle(textChunks[k])) {
+      endPos = k - 1
 
       break
     }
@@ -118,13 +128,18 @@ function extractProfileApplicability(textChunks) {
   // There Might be multiple levels in this slice. We retrieve the largest level here.
   let maxPassVal = 0
   const passValueSlice = textChunks.slice(startPos + 1, endPos + 1)
+  const passValueContent = composeContentFromTextChunks(passValueSlice)
 
-  passValueSlice.forEach(s => {
+  const passValueArr = passValueContent
+    .replace(PASS_SCORE_REGEX, '$&|')
+    .split('|')
+
+  passValueArr.forEach(s => {
     // Check if the pattern exists in the given string.
-    const isPassValueExists = PASS_SCORE_REGEX.test(extractText(s))
+    const isPassValueExists = PASS_SCORE_REGEX.test(s)
 
     if (isPassValueExists) {
-      const result = PASS_SCORE_REGEX.exec(extractText(s))
+      const result = PASS_SCORE_REGEX.exec(s)
       const [, passVal] = result
       const intPassVal = parseInt(passVal)
 
@@ -145,11 +160,10 @@ function extractProfileApplicability(textChunks) {
 function extractDescInfo(textChunks) {
   // Find text range before "Rationale:"
   let endPos = 0
-  //console.log('extractDescInfo spot 1', extractText(textChunks[0]))
   for (let i = 1; i < textChunks.length; i++) {
-    const isRationale = SEGMENT_DELIMITER_REGEX.test(extractText(textChunks[i]))
+    const isDeliminator = COLON_DELIMITER_REGEX.test(extractText(textChunks[i]))
 
-    if (isRationale) {
+    if (isDeliminator && isSubTitle(textChunks[i])) {
       endPos = i - 1
 
       break
@@ -157,7 +171,7 @@ function extractDescInfo(textChunks) {
   }
 
   // Now we can compose content for description.
-  const descChunks = textChunks.slice(1, endPos + 1)
+  const descChunks = textChunks.slice(1, endPos)
   const content = composeContentFromTextChunks(descChunks)
 
   return {
@@ -169,8 +183,11 @@ function extractDescInfo(textChunks) {
 function extractRationale(textChunks) {
   let endPos = 0
 
-  for (let i = 0; i < textChunks.length; i++) {
-    if (AUDIT_REGEX.test(extractText(textChunks[i]))) {
+  for (let i = 1; i < textChunks.length; i++) {
+    const isDeliminator = COLON_DELIMITER_REGEX.test(extractText(textChunks[i]))
+
+    if (isDeliminator && isSubTitle(textChunks[i])) {
+
       endPos = i - 1
 
       break
@@ -181,18 +198,16 @@ function extractRationale(textChunks) {
 
   return {
     rel_end_pos: endPos,
-    content:composeContentFromTextChunks(rationaleChunks)
+    content: removePDFPageText(composeContentFromTextChunks(rationaleChunks))
   }
 }
 
 function extractAuditInfo(textChunks) {
   let endPos = 0
 
-  console.log('extractAuditInfo spot 1', extractText(textChunks[0]))
+  //console.log('extractAuditInfo spot 1', extractText(textChunks[0]))
   for (let i = 1; i < textChunks.length; i++) {
     if (REMEDIATION_REGEX.test(extractText(textChunks[i]))) {
-
-      console.log('extractAuditInfo spot 2', i)
       endPos = i - 1
 
       break
@@ -279,14 +294,6 @@ function extractImpact(textChunks) {
     rel_end_pos: endPos,
     content,
   }
-}
-
-function composeContentFromTextChunks (textChunks) {
-  return textChunks.reduce((content, chunk) => {
-    content += extractText(chunk)
-
-    return content
-  }, '')
 }
 
 module.exports = parseRiskText

@@ -11,7 +11,7 @@
 //   - 1.5 Enable system data files and security update installs (Scored)
 //
 // Each "Page" element has a "Text" element which contains the literature for each rule. We'll need to recognize the rule title using text style or regular expression.
-// The structure of a ranged chunk are to be like:
+// The expected structure of a ranged chunks are to be like:
 //
 // {
 //   "1.1 Verify all Apple provided software is current (Scored):" {
@@ -49,22 +49,20 @@ const handleData = chunk => {
   const fullTexts = getTextElems(chunk.Pages)
   const tags = riskRangeTags(fullTexts)
 
-  //const s = tags.find(tag => tag.ref === '3.5')
+  //const s = tags.find(tag => tag.ref === '5.10')
   //const obj = parseRiskText(s)
 
   //console.log('res obj', obj)
 
   const riskInfoObjs = tags.map(chunk => parseRiskText(chunk))
 
-  console.log('riskInfoObjs', riskInfoObjs)
+  fs.writeFile('./data_seeder.json', JSON.stringify(riskInfoObjs) , err => {
+    if (err) {
+        throw err;
+    }
 
-  //fs.writeFile('./data_seeder.json', JSON.stringify(riskInfoObjs) , err => {
-    //if (err) {
-        //throw err;
-    //}
-
-    //console.error("JSON data is saved.");
-  //})
+    console.error("JSON data is saved.");
+  })
 }
 
 const getTextElems = pages =>
