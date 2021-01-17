@@ -7,11 +7,23 @@ const {
 
 const { composeContentFromTextChunks } = require('./util')
 
+/**
+ * @TODO Title text style are different for each PDF.
+ * fontFaceID and fontSize should be passed in as arguments, to
+ * fit the custom needs for each PDF.
+ *
+ * For example:
+ *
+ *   Win10 has title text style of `fontFaceID=2` and `fontSize=19.025`, whereas
+ *   MacOS has title text style of `fontFaceID=2` and `fontSize=18.96`.
+ *
+ */
 const isRiskTitle = textObj => {
   // determine if is text title via text style.
   const [fontFaceID, fontSize] = extractTextStyle(textObj)
 
-  return fontFaceID === 2 && fontSize === 18.96
+  //return fontFaceID === 2 && fontSize === 18.96
+  return fontFaceID === 2 && fontSize === 19.025
 }
 
 /**
@@ -31,7 +43,7 @@ const isRiskTitle = textObj => {
  * }
  */
 
-const RISK_TITLE_SEP_REG = /^(\d+\.\d+(\.\d+){0,2})(.*)\((Scored|Not%20Scored)\)$/
+const RISK_TITLE_SEP_REG = /^(\d+\.\d+(\.\d+){0,3})(.*)\((Scored|Not%20Scored)\)$/
 
 function riskRangeTags(texts) {
   const titleChunks = []
@@ -103,19 +115,11 @@ function setRiskChunkRange(titleList, textChunks) {
   // Iterate through title list, retrieve ref from
   // each title object. We will locate the postion
   // of text chunk in textChunks array.
-
   let riskRangeTags = []
-  let riskRangeStartPos = 0
   let i = 0
-
-  //const pos = findRefIndex('5.2.2', '5.2.3', textChunks)
-  //console.log('DEBUG pos 1', pos)
-  //console.log('DEBUG pos 2', titleList)
 
   while (i < titleList.length) {
     const { ref: startRef } = titleList[i]
-
-    //const partialTextChunks = textChunks.slice(riskRangeStartPos)
 
     // "endRef" equals to null indicates that it is
     // the last risk title. Assume the rest of the PDF
@@ -130,10 +134,8 @@ function setRiskChunkRange(titleList, textChunks) {
       startRef,
       endRef,
       textChunks,
-      //riskRangeStartPos,
     )
 
-    //console.log('DEBUG pos', pos)
     riskRangeTags.push({
       ...titleList[i],
       ...pos,
@@ -142,8 +144,6 @@ function setRiskChunkRange(titleList, textChunks) {
         pos.end_pos + 1,
       ),
     })
-
-    //riskRangeStartPos = pos.end_pos + 1
 
     i++
   }

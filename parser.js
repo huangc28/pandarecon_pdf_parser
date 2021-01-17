@@ -35,7 +35,8 @@ const riskRangeTags = require('./get_risk_range_tags')
 const parseRiskText = require('./parse_risk_text')
 
 //const fileName = path.resolve(__dirname, './macOS_partial.json')
-const fileName = path.resolve(__dirname, './macOS_risk_only.json')
+//const fileName = path.resolve(__dirname, './macOS_risk_only.json')
+const fileName = path.resolve(__dirname, './CIS_Microsoft_Windows_10_Enterprise_Release_1909_Benchmark_v1.8.1_risk_only.json')
 
 const read = fileName => {
   const s = fs.createReadStream(fileName, { encoding: 'utf8' })
@@ -47,16 +48,21 @@ const read = fileName => {
 
 const handleData = chunk => {
   const fullTexts = getTextElems(chunk.Pages)
+
   const tags = riskRangeTags(fullTexts)
 
-  //const s = tags.find(tag => tag.ref === '5.10')
+  //console.log('DEBUG tags', tags)
+  //tags.forEach(tag => console.log(tag.ref))
+
+  //const s = tags.find(tag => tag.ref === '2.2.29')
+  //console.log('DEBUG s', s)
   //const obj = parseRiskText(s)
 
   //console.log('res obj', obj)
 
   const riskInfoObjs = tags.map(chunk => parseRiskText(chunk))
 
-  fs.writeFile('./data_seeder.json', JSON.stringify(riskInfoObjs) , err => {
+  fs.writeFile('./win10_1909_data_seeder.json', JSON.stringify(riskInfoObjs) , err => {
     if (err) {
         throw err;
     }

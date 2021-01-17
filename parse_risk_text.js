@@ -49,8 +49,6 @@ function parseRiskText(textObj) {
   const rationaleChunks = textChunks.slice(apInfo.end_pos+1 + descInfo.rel_end_pod+1)
   const rationaleInfo = extractRationale(rationaleChunks)
 
-  //console.log('DEBUG 31', rationaleInfo)
-
   // The start of "Audit" is the end position of "Rationale".
   const auditChunks = rationaleChunks.slice(rationaleInfo.rel_end_pos+1)
   const auditInfo = extractAuditInfo(auditChunks)
@@ -71,27 +69,52 @@ function parseRiskText(textObj) {
     control_name: ctrlName,
     control_description: descInfo.content,
     pass_value: apInfo.pass_val,
-    command: auditInfo.command,
+    commands: auditInfo.commands,
     remediation: remediationInfo.content,
     impact: impactInfo.content,
   }
 }
 
-const isSubTitle = textObj => {
+/**
+ * @TODO Each PDF has different style of subtitle. Thus, font face id
+ * and font size should be passed in as arguments to match different
+ * PDF subtitle style.
+ */
+const isSubTitleStyle = textObj => {
   const [fontFaceID, fontSize] = extractTextStyle(textObj)
-  return fontFaceID === 2 && fontSize === 16
+
+  //return fontFaceID === 2 && fontSize === 16;
+  return fontFaceID === 2 && fontSize === 16.025;
+
 }
 
-const PROFILE_APPLICABILITY_REGEX = /^Profile%20Applicability%3A$/
-const DESCRIPTION_REGEX = /^Description%3A$/
-const PASS_SCORE_REGEX = /Level%20(\d+)$/
+const PASS_SCORE_REGEX = /Level%20(\d+).*$/
 const AUDIT_REGEX = /^Audit%3A$/
 const REMEDIATION_REGEX = /^R?emediation?(%3A)?$/
 const IMPACT_REGEX = /^Impact%3A$/
 const CIS_CONTROL_REGEX = /^CIS(%20Controls%3A)?$/
-
-const SEGMENT_DELIMITER_REGEX = /^(Profile%20Applicability%3A|Description%3A|Rationale%3A|Audit%3A|Remediation%3A|Impact%3A|CIS%20Controls%3A)$/
 const COLON_DELIMITER_REGEX = /^.*%3A$/
+const NOTE_SUBTITLE_REGEX =  /^Note(%20%23\d)?%3A$/
+//Note%20%232%3A
+//const NOTE_NUM_SUBTITLE_REGEX =  /^Note%3A$/
+
+/**
+ * We are using /^.*%3A$/ to find the end position for each subtitle segment.
+ * For example:
+ *
+ *   Profile Applicability:
+ *   Description: ---> This is the end position of the "Profile Applicability"
+ *   Rationale: ---> This is the end position of the "Description"
+ *
+ * However, this regex can't differentiate the subtitle we want to exclude from.
+ * The following list is what we want to emit.
+ */
+const exceptionSubtitleRegs = [
+  NOTE_SUBTITLE_REGEX,
+]
+
+const shouldOmitSubtitle = subtitle => exceptionSubtitleRegs.some(regex => regex.test(subtitle))
+
 
 function extractProfileApplicability(textChunks) {
   let startPos = 0
@@ -103,8 +126,7 @@ function extractProfileApplicability(textChunks) {
     // Record the starting position.
     const isDeliminator = COLON_DELIMITER_REGEX.test(extractText(textChunks[i]))
 
-    if (isDeliminator && isSubTitle(textChunks[i])) {
-      console.log('spot 1', extractText(textChunks[i]))
+    if (isDeliminator && isSubTitleStyle(textChunks[i])) {
       startPos = i
 
       break
@@ -116,7 +138,7 @@ function extractProfileApplicability(textChunks) {
     // Record the ending position.
     const isDeliminator = COLON_DELIMITER_REGEX.test(extractText(textChunks[k]))
 
-    if (isDeliminator && isSubTitle(textChunks[k])) {
+    if (isDeliminator && isSubTitleStyle(textChunks[k])) {
       endPos = k - 1
 
       break
@@ -163,7 +185,11 @@ function extractDescInfo(textChunks) {
   for (let i = 1; i < textChunks.length; i++) {
     const isDeliminator = COLON_DELIMITER_REGEX.test(extractText(textChunks[i]))
 
-    if (isDeliminator && isSubTitle(textChunks[i])) {
+    if (isDeliminator && isSubTitleStyle(textChunks[i])) {
+      const shouldOmit = shouldOmitSubtitle(extractText(textChunks[i]))
+
+      if (shouldOmit) continue;
+
       endPos = i - 1
 
       break
@@ -186,7 +212,10 @@ function extractRationale(textChunks) {
   for (let i = 1; i < textChunks.length; i++) {
     const isDeliminator = COLON_DELIMITER_REGEX.test(extractText(textChunks[i]))
 
-    if (isDeliminator && isSubTitle(textChunks[i])) {
+    if (isDeliminator && isSubTitleStyle(textChunks[i])) {
+      const shouldOmit = shouldOmitSubtitle(extractText(textChunks[i]))
+
+      if (shouldOmit) continue;
 
       endPos = i - 1
 
@@ -205,7 +234,6 @@ function extractRationale(textChunks) {
 function extractAuditInfo(textChunks) {
   let endPos = 0
 
-  //console.log('extractAuditInfo spot 1', extractText(textChunks[0]))
   for (let i = 1; i < textChunks.length; i++) {
     if (REMEDIATION_REGEX.test(extractText(textChunks[i]))) {
       endPos = i - 1
@@ -215,15 +243,26 @@ function extractAuditInfo(textChunks) {
   }
 
   const auditChunks = textChunks.slice(1, endPos + 1)
+
   // Try parse "command" and "result" from the edit chunks.
-  command = parseCommandFromAuditTexts(auditChunks)
+  commands = parseCommandFromAuditTexts(auditChunks)
 
   return {
     rel_end_pos: endPos,
-    command,
+    commands,
   }
 }
 
+/**
+ * @TODO
+ *   - command text style is different accross PDFs. Thus,
+ *     font face id and font size should be passed in as arguments.
+ *     to be able to identify command blocks properly.
+ *
+ *   - There might be multiple command blocks exists in audit section. We need
+ *   to be able to identify those
+ *
+ */
 function parseCommandFromAuditTexts(auditChunks) {
   // The command are wrapped in a code block with
   // fontFaceID: 3 and fontSize: 12.96. We can filter
@@ -231,29 +270,40 @@ function parseCommandFromAuditTexts(auditChunks) {
   //
   // Note, a audit region may contain multiple code blocks.
   // We assume that the first block is the command code block.
-
-  const commandCodeTexts = []
+  let commandCodeTexts = []
+  const commands = []
   let foundAt = null
 
   for (let i = 0; i < auditChunks.length; i++) {
     const [fontFaceID, fontSize] = extractTextStyle(auditChunks[i])
 
-    if (fontFaceID === 3 && fontSize === 12.96) {
+    //if (fontFaceID === 3 && fontSize === 12.96) {
+    if (fontFaceID === 3 && fontSize === 13.4) {
       if (foundAt === null || i - foundAt === 1) {
         commandCodeTexts.push(auditChunks[i])
 
         foundAt = i
+      }
+    } else {
+      if (commandCodeTexts.length > 0) {
+        // Since the next line is not in command block. The previous command
+        // block has completed. We'll flush out the command text from "commandCodeText"
+        const commandText = composeContentFromTextChunks(commandCodeTexts)
 
-        continue
+        commands.push(commandText)
+
+
+        commandCodeTexts = []
       }
 
-      if (i - foundAt > 1) {
-        break
-      }
+      // The next line is not in the command block,
+      // let's match the next line to see if is
+      // in the command block.
+      foundAt = null;
     }
   }
 
-  return composeContentFromTextChunks(commandCodeTexts)
+  return commands
 }
 
 function extractRemediation(textChunks) {
@@ -279,11 +329,17 @@ function extractRemediation(textChunks) {
 function extractImpact(textChunks) {
   let endPos = 0
 
-  for (let i = 0; i < textChunks.length; i++) {
-    if (CIS_CONTROL_REGEX.test(extractText(textChunks[i]))) {
+  for (let i = 1; i < textChunks.length; i++) {
+    const isDeliminator = COLON_DELIMITER_REGEX.test(extractText(textChunks[i]))
+
+    if (isDeliminator && isSubTitleStyle(textChunks[i])) {
+      const shouldOmit = shouldOmitSubtitle(extractText(textChunks[i]))
+
+      if (shouldOmit) continue;
+
       endPos = i - 1
 
-      break;
+      break
     }
   }
 
