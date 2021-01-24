@@ -5,6 +5,8 @@ const {
   extractText,
 } = require('./extractors')
 
+const pandaRiskConfg = require('./pandarisk.config')
+
 const { composeContentFromTextChunks } = require('./util')
 
 /**
@@ -22,8 +24,21 @@ const isRiskTitle = textObj => {
   // determine if is text title via text style.
   const [fontFaceID, fontSize] = extractTextStyle(textObj)
 
-  //return fontFaceID === 2 && fontSize === 18.96
-  return fontFaceID === 2 && fontSize === 19.025
+  const { currentOs, parseStyle } = pandaRiskConfg
+
+  const { riskTitleStyle } = parseStyle[currentOs]
+
+  return fontFaceID === riskTitleStyle.fontFaceID && fontSize === riskTitleStyle.fontSize
+}
+
+const isHeaderTitle = textObj => {
+  const [fontFaceID, fontSize] = extractTextStyle(textObj)
+
+  const { currentOs, parseStyle } = pandaRiskConfg
+
+  const { headerTitleStyle } = parseStyle[currentOs]
+
+  return fontFaceID === headerTitleStyle.fontFaceID && fontSize === headerTitleStyle.fontSize
 }
 
 /**
@@ -42,28 +57,32 @@ const isRiskTitle = textObj => {
  *   },
  * }
  */
-
-const RISK_TITLE_SEP_REG = /^(\d+\.\d+(\.\d+){0,3})(.*)\((Scored|Not%20Scored)\)$/
+const RISK_TITLE_SEP_REG = /^(\d+(\.\d+){0,5})(.*)\((Scored|Not%20Scored)\)$/
+const HEADER_TITLE_SEP_REG = /^(\d+(%20)?(\.\d+){0,5})(.*)$/
 
 function riskRangeTags(texts) {
-  const titleChunks = []
+  const titleChunks = texts.filter(text => isRiskTitle(text))
+  const headerChunks = texts.filter(chunk => isHeaderTitle(chunk))
 
-  texts.forEach(textObj => {
-    if (isRiskTitle(textObj)) {
-      titleChunks.push(textObj)
-    }
-  })
-
-  // Mash all title in to one big chunk on text.
+  // Merge all title to one big chunk on text.
   const titleContent = composeContentFromTextChunks(titleChunks)
-  const titleList = parseTitleChunkToTitleList(titleContent)
+  const titleList = parseTitleContentToTitleList(titleContent)
 
-  return setRiskChunkRange(titleList, texts)
+  // Merge all title to one big chunk on text.
+  const headerContent = composeContentFromTextChunks(headerChunks)
+  const headerList = parseHeaderContentToTitleList(headerContent)
+
+  // Since headers have different text style and matching pattern
+  // than risk title, it's not possible to keep them in order.
+  // Just simply concat them.
+
+  return {
+    headerList,
+    titleList: setRiskChunkRange(titleList, texts),
+  }
 }
 
 function findRefIndex(startRef, endRef, chunks/*, prevEndPos*/) {
-  //console.log()
-
   let startRefPos = 0
   let endRefPos = 0
 
@@ -71,12 +90,9 @@ function findRefIndex(startRef, endRef, chunks/*, prevEndPos*/) {
     const text = extractText(chunks[i])
 
     // Find start position for startRef in the text chunks.
-    if (text.startsWith(startRef) && isRiskTitle(chunks[i])) {
-      //console.log('findRefIndex 1', extractText(chunks[i]))
-
+    //if (text.startsWith(startRef) && isRiskTitle(chunks[i])) {
+    if (text.startsWith(startRef)) {
       startRefPos = i
-
-      //console.log('DEBUG start ref spot 3', i)
 
       if (endRef === null) {
         endRefPos = chunks.length - 1
@@ -91,7 +107,6 @@ function findRefIndex(startRef, endRef, chunks/*, prevEndPos*/) {
       const text = extractText(chunks[k])
 
       if (text.startsWith(endRef) && isRiskTitle(chunks[k])) {
-        //console.log('findRefIndex 2', extractText(chunks[k]))
         endRefPos = k - 1
 
         break
@@ -99,11 +114,8 @@ function findRefIndex(startRef, endRef, chunks/*, prevEndPos*/) {
     }
   }
 
-  //console.log('DEBUG start ref spot 4', startRefPos)
-
   return {
     start_pos: startRefPos,
-    //end_pos: prevEndPos + endRefPos,
     end_pos: endRefPos,
   }
 }
@@ -151,8 +163,8 @@ function setRiskChunkRange(titleList, textChunks) {
   return riskRangeTags
 }
 
-function parseTitleChunkToTitleList(titleChunks) {
-  const titles = titleChunks
+function parseTitleContentToTitleList(content) {
+  const titles = content
     .replace(/\((Scored|Not%20Scored)\)/g, '$&|')
     .split('|')
     .filter(title => !!title)
@@ -167,6 +179,23 @@ function parseTitleChunkToTitleList(titleChunks) {
     })
 
   return titles
+}
+
+function parseHeaderContentToTitleList(content) {
+  const headers = content
+    .replace(/([a-zA-Z]+\)?)(\d+)/g, '$1|$2')
+    .split('|')
+    .filter(title => !!title)
+    .map(title => {
+      const [, ref,,, ctrl_name] = HEADER_TITLE_SEP_REG.exec(title)
+
+      return {
+        ref,
+        ctrl_name,
+      }
+    })
+
+  return headers
 }
 
 module.exports = riskRangeTags

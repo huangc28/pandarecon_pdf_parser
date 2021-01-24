@@ -3,6 +3,7 @@ const {
   composeContentFromTextChunks,
   removePDFPageText,
 } = require('./util')
+const config = require('./pandarisk.config')
 
 // This function extracts the information we need from risk chunk.
 // It analyzes the text chunks for each risk and try to parse the following
@@ -61,7 +62,6 @@ function parseRiskText(textObj) {
   const impactChunks = remediationChunks.slice(remediationInfo.rel_end_pos+1)
   const impactInfo = extractImpact(impactChunks)
 
-
   // Now we have all information, we can start return all information.
   return {
     control_ref: ref,
@@ -72,6 +72,8 @@ function parseRiskText(textObj) {
     commands: auditInfo.commands,
     remediation: remediationInfo.content,
     impact: impactInfo.content,
+    control_group: config.currentGroup,
+    control_type: config.currentOs,
   }
 }
 
@@ -83,20 +85,19 @@ function parseRiskText(textObj) {
 const isSubTitleStyle = textObj => {
   const [fontFaceID, fontSize] = extractTextStyle(textObj)
 
-  //return fontFaceID === 2 && fontSize === 16;
-  return fontFaceID === 2 && fontSize === 16.025;
+  const { currentOs, parseStyle } = config
+  const { subtitleStyle } = parseStyle[currentOs]
 
+
+  //return fontFaceID === 2 && fontSize === 16;
+  return fontFaceID === subtitleStyle.fontFaceID && fontSize === subtitleStyle.fontSize;
 }
 
 const PASS_SCORE_REGEX = /Level%20(\d+).*$/
-const AUDIT_REGEX = /^Audit%3A$/
 const REMEDIATION_REGEX = /^R?emediation?(%3A)?$/
 const IMPACT_REGEX = /^Impact%3A$/
-const CIS_CONTROL_REGEX = /^CIS(%20Controls%3A)?$/
 const COLON_DELIMITER_REGEX = /^.*%3A$/
 const NOTE_SUBTITLE_REGEX =  /^Note(%20%23\d)?%3A$/
-//Note%20%232%3A
-//const NOTE_NUM_SUBTITLE_REGEX =  /^Note%3A$/
 
 /**
  * We are using /^.*%3A$/ to find the end position for each subtitle segment.
@@ -277,8 +278,12 @@ function parseCommandFromAuditTexts(auditChunks) {
   for (let i = 0; i < auditChunks.length; i++) {
     const [fontFaceID, fontSize] = extractTextStyle(auditChunks[i])
 
+    const { currentOs, parseStyle } = config
+    const { commandBlockStyle } = parseStyle[currentOs]
+
+
     //if (fontFaceID === 3 && fontSize === 12.96) {
-    if (fontFaceID === 3 && fontSize === 13.4) {
+    if (fontFaceID === commandBlockStyle.fontFaceID && fontSize === commandBlockStyle.fontSize) {
       if (foundAt === null || i - foundAt === 1) {
         commandCodeTexts.push(auditChunks[i])
 

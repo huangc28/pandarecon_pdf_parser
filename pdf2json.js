@@ -12,12 +12,13 @@ const fileName = 'CIS_Microsoft_Windows_10_Enterprise_Release_1909_Benchmark_v1.
 //const targetFileName = './macOS_risk_only.json'
 const targetFileName = './CIS_Microsoft_Windows_10_Enterprise_Release_1909_Benchmark_v1.8.1_risk_only.json'
 
-function StringifyStream(){
+function StringifyStream() {
      stream.Transform.call(this);
 
      this._readableState.objectMode = false;
      this._writableState.objectMode = true;
  }
+
  nodeUtil.inherits(StringifyStream, stream.Transform);
 
  StringifyStream.prototype._transform = function(obj, encoding, callback){

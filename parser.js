@@ -33,10 +33,7 @@ const JSONStream = require('JSONStream')
 
 const riskRangeTags = require('./get_risk_range_tags')
 const parseRiskText = require('./parse_risk_text')
-
-//const fileName = path.resolve(__dirname, './macOS_partial.json')
-//const fileName = path.resolve(__dirname, './macOS_risk_only.json')
-const fileName = path.resolve(__dirname, './CIS_Microsoft_Windows_10_Enterprise_Release_1909_Benchmark_v1.8.1_risk_only.json')
+const pandaRiskConf = require('./pandarisk.config')
 
 const read = fileName => {
   const s = fs.createReadStream(fileName, { encoding: 'utf8' })
@@ -47,11 +44,14 @@ const read = fileName => {
 }
 
 const handleData = chunk => {
+  // Retrieve config object
   const fullTexts = getTextElems(chunk.Pages)
 
-  const tags = riskRangeTags(fullTexts)
+  const {
+    headerList,
+    titleList,
+  } = riskRangeTags(fullTexts)
 
-  //console.log('DEBUG tags', tags)
   //tags.forEach(tag => console.log(tag.ref))
 
   //const s = tags.find(tag => tag.ref === '2.2.29')
@@ -60,15 +60,22 @@ const handleData = chunk => {
 
   //console.log('res obj', obj)
 
-  const riskInfoObjs = tags.map(chunk => parseRiskText(chunk))
+  const riskInfoObjs = titleList.map(chunk => parseRiskText(chunk))
+  const masterInfo = headerList.concat(riskInfoObjs)
 
-  fs.writeFile('./win10_1909_data_seeder.json', JSON.stringify(riskInfoObjs) , err => {
-    if (err) {
-        throw err;
+  const { outputFilename } = pandaRiskConf
+
+  fs.writeFile(
+    path.resolve(__dirname, outputFilename),
+    JSON.stringify(masterInfo) ,
+    err => {
+      if (err) {
+          throw err;
+      }
+
+      console.error("JSON data is saved.");
     }
-
-    console.error("JSON data is saved.");
-  })
+  )
 }
 
 const getTextElems = pages =>
@@ -82,7 +89,13 @@ const getTextElems = pages =>
 
 
 const main = () => {
-  const rs = read(fileName)
+  const filename = path.resolve(
+    __dirname,
+    pandaRiskConf.filePath,
+  )
+
+  const rs = read(filename)
+
   rs.on('data', handleData)
   rs.on('end ', handleEnd)
 
