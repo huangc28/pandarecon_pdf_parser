@@ -34,6 +34,8 @@ const JSONStream = require('JSONStream')
 const riskRangeTags = require('./get_risk_range_tags')
 const parseRiskText = require('./parse_risk_text')
 const pandaRiskConf = require('./pandarisk.config')
+const { isRiskTitle } = require('./text_matchers')
+const { extractText } = require('./extractors')
 
 const read = fileName => {
   const s = fs.createReadStream(fileName, { encoding: 'utf8' })
@@ -43,19 +45,96 @@ const read = fileName => {
   return s.pipe(parser)
 }
 
+// Let's try to merge the title chunk all together.
+// The title chunk can be separated into several
+// text chunks. This causes `setRiskChunkRange` can't
+// match the reference number in the text chunks. For example:
+// ref: 18.9.95.2 can be seperated into several text chunks after
+// parsed by pdf2json.
+//
+// {
+//    "R": [
+//      { "T": "18." }
+//    ]
+// },
+//
+// {
+//   "R": [
+//     { "T": "9.95.2" }
+//   ]
+// }
+//
+// Thus, we need to merge content of "T" of these two text chunk
+// into 1.
+const mergeTitleChunks = chunks => {
+  const traceTitleChunks = (chunks, at) => {
+    if (isRiskTitle(chunks[at + 1])) {
+      return traceTitleChunks(chunks, at + 1)
+    }
+
+    return at
+  }
+
+  const mergeChunksText = chunks => {
+    return chunks
+      .reduce(
+        (accu, chunk) => {
+          accu += extractText(chunk)
+
+          return accu
+        },
+        '',
+      )
+  }
+
+  const titleList = []
+
+  // Iterate through each chunk. Try to find title chunk in the list.
+  // If we find a title chunk, there will be a great chance where the next
+  // text chunk is title chunk either.
+  let i = 0
+
+  while (i < chunks.length) {
+    if (isRiskTitle(chunks[i])) {
+      const endRef = traceTitleChunks(chunks, i)
+
+      // Now we found the last text chunk of the current title
+      // merge them all together
+      const partialTitleChunks = chunks.slice(i, endRef + 1)
+      const mergedText = mergeChunksText(partialTitleChunks)
+
+      chunks[i]['R'][0]['T'] = mergedText
+      titleList.push(chunks[i])
+
+      i += (endRef - i) + 1
+    } else {
+      titleList.push(chunks[i])
+
+      i++
+    }
+  }
+
+  return titleList
+};
+
 const handleData = chunk => {
   // Retrieve config object
   const fullTexts = getTextElems(chunk.Pages)
 
+  const mergedTitleText = mergeTitleChunks(fullTexts)
+
+  //const s = mergedTitleText.find(tag => tag.ref === '18.9.95.1')
+
+  //console.log('DEBUG s', mergedTitleText)
+
   const {
     headerList,
     titleList,
-  } = riskRangeTags(fullTexts)
+  } = riskRangeTags(mergedTitleText)
 
   //tags.forEach(tag => console.log(tag.ref))
 
-  //const s = tags.find(tag => tag.ref === '2.2.29')
-  //console.log('DEBUG s', s)
+  //const s = titleList.find(tag => tag.ref === '18.9.95.1')
   //const obj = parseRiskText(s)
 
   //console.log('res obj', obj)

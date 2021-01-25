@@ -76,6 +76,8 @@ function riskRangeTags(texts) {
   // than risk title, it's not possible to keep them in order.
   // Just simply concat them.
 
+  //console.log('DEBUG 1', titleList)
+
   return {
     headerList,
     titleList: setRiskChunkRange(titleList, texts),
@@ -132,6 +134,10 @@ function setRiskChunkRange(titleList, textChunks) {
 
   while (i < titleList.length) {
     const { ref: startRef } = titleList[i]
+
+    if (startRef === '18.9.95.1') {
+      console.log('NEXT ref', titleList[i+1])
+    }
 
     // "endRef" equals to null indicates that it is
     // the last risk title. Assume the rest of the PDF

@@ -1,4 +1,5 @@
 const { extractText, extractTextStyle } = require('./extractors')
+const { isCommandBlockStyle } = require('./text_matchers')
 const {
   composeContentFromTextChunks,
   removePDFPageText,
@@ -276,14 +277,7 @@ function parseCommandFromAuditTexts(auditChunks) {
   let foundAt = null
 
   for (let i = 0; i < auditChunks.length; i++) {
-    const [fontFaceID, fontSize] = extractTextStyle(auditChunks[i])
-
-    const { currentOs, parseStyle } = config
-    const { commandBlockStyle } = parseStyle[currentOs]
-
-
-    //if (fontFaceID === 3 && fontSize === 12.96) {
-    if (fontFaceID === commandBlockStyle.fontFaceID && fontSize === commandBlockStyle.fontSize) {
+    if (isCommandBlockStyle(auditChunks[i])) {
       if (foundAt === null || i - foundAt === 1) {
         commandCodeTexts.push(auditChunks[i])
 
