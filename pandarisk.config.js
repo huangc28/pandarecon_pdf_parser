@@ -19,9 +19,10 @@ const outputFilenames = {
 }
 
 const config = {
-  filePath: './data_source/CIS_Microsoft_Windows_8.1_Workstation_Benchmark_v2.4.0_risk_only.json',
+  //filePath: './data_source/CIS_Microsoft_Windows_8.1_Workstation_Benchmark_v2.4.0_risk_only.json',
+  filePath: './data_source/macOS_risk_only.json',
 
-  currentOs: osTypes.MS_WIN_8_1_WORKSTATION,
+  currentOs: osTypes.MAC_OS,
 
   currentGroup: null,
 

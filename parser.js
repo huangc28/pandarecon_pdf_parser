@@ -31,6 +31,7 @@ const fs = require('fs')
 const path = require('path')
 const JSONStream = require('JSONStream')
 
+const { composeContentFromTextChunks } = require('./util')
 const riskRangeTags = require('./get_risk_range_tags')
 const parseRiskText = require('./parse_risk_text')
 const pandaRiskConf = require('./pandarisk.config')
@@ -132,12 +133,18 @@ const handleData = chunk => {
     titleList,
   } = riskRangeTags(mergedTitleText)
 
-  //tags.forEach(tag => console.log(tag.ref))
 
-  //const s = titleList.find(tag => tag.ref === '18.9.95.1')
+  //const s = titleList.find(tag => tag.ref === '18.9.11.2.1')
+
+  //console.log('DEBUG 1', s)
+
+  //const content = composeContentFromTextChunks(s.text_chunks)
+
+  //console.log('DEBUG 3', content)
+
   //const obj = parseRiskText(s)
 
-  //console.log('res obj', obj)
+  //console.log('DEBUG 2', obj)
 
   const riskInfoObjs = titleList.map(chunk => parseRiskText(chunk))
   const masterInfo = headerList.concat(riskInfoObjs)

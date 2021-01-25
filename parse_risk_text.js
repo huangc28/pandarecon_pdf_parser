@@ -1,5 +1,8 @@
 const { extractText, extractTextStyle } = require('./extractors')
-const { isCommandBlockStyle } = require('./text_matchers')
+const {
+  isCommandBlockStyle,
+  isSubTitleStyle,
+} = require('./text_matchers')
 const {
   composeContentFromTextChunks,
   removePDFPageText,
@@ -53,7 +56,11 @@ function parseRiskText(textObj) {
 
   // The start of "Audit" is the end position of "Rationale".
   const auditChunks = rationaleChunks.slice(rationaleInfo.rel_end_pos+1)
+
+  //console.log('DEBUG auditInfo', composeContentFromTextChunks(auditChunks))
+
   const auditInfo = extractAuditInfo(auditChunks)
+
 
   // The start of "Remediation" is the end position of "Audit".
   const remediationChunks = auditChunks.slice(auditInfo.rel_end_pos+1)
@@ -76,22 +83,6 @@ function parseRiskText(textObj) {
     control_group: config.currentGroup,
     control_type: config.currentOs,
   }
-}
-
-/**
- * @TODO Each PDF has different style of subtitle. Thus, font face id
- * and font size should be passed in as arguments to match different
- * PDF subtitle style.
- */
-const isSubTitleStyle = textObj => {
-  const [fontFaceID, fontSize] = extractTextStyle(textObj)
-
-  const { currentOs, parseStyle } = config
-  const { subtitleStyle } = parseStyle[currentOs]
-
-
-  //return fontFaceID === 2 && fontSize === 16;
-  return fontFaceID === subtitleStyle.fontFaceID && fontSize === subtitleStyle.fontSize;
 }
 
 const PASS_SCORE_REGEX = /Level%20(\d+).*$/
@@ -237,7 +228,9 @@ function extractAuditInfo(textChunks) {
   let endPos = 0
 
   for (let i = 1; i < textChunks.length; i++) {
-    if (REMEDIATION_REGEX.test(extractText(textChunks[i]))) {
+    const isDeliminator = COLON_DELIMITER_REGEX.test(extractText(textChunks[i]))
+
+    if (isDeliminator && isSubTitleStyle(textChunks[i])) {
       endPos = i - 1
 
       break
@@ -247,7 +240,7 @@ function extractAuditInfo(textChunks) {
   const auditChunks = textChunks.slice(1, endPos + 1)
 
   // Try parse "command" and "result" from the edit chunks.
-  commands = parseCommandFromAuditTexts(auditChunks)
+  const commands = parseCommandFromAuditTexts(auditChunks)
 
   return {
     rel_end_pos: endPos,
@@ -281,6 +274,7 @@ function parseCommandFromAuditTexts(auditChunks) {
       if (foundAt === null || i - foundAt === 1) {
         commandCodeTexts.push(auditChunks[i])
 
+
         foundAt = i
       }
     } else {
@@ -291,7 +285,6 @@ function parseCommandFromAuditTexts(auditChunks) {
 
         commands.push(commandText)
 
-
         commandCodeTexts = []
       }
 
@@ -299,6 +292,13 @@ function parseCommandFromAuditTexts(auditChunks) {
       // let's match the next line to see if is
       // in the command block.
       foundAt = null;
+    }
+
+    // If we are at the last text chunk of audit, flush whatever
+    // left in commandCodeTexts and compose the data to command text.
+    if (i === auditChunks.length - 1) {
+        const commandText = composeContentFromTextChunks(commandCodeTexts)
+        commands.push(commandText)
     }
   }
 

@@ -1,45 +1,12 @@
 "use strict"
 
+const { extractText } = require('./extractors')
 const {
-  extractTextStyle,
-  extractText,
-} = require('./extractors')
-
-const pandaRiskConfg = require('./pandarisk.config')
+  isRiskTitle,
+  isHeaderTitle,
+} = require('./text_matchers')
 
 const { composeContentFromTextChunks } = require('./util')
-
-/**
- * @TODO Title text style are different for each PDF.
- * fontFaceID and fontSize should be passed in as arguments, to
- * fit the custom needs for each PDF.
- *
- * For example:
- *
- *   Win10 has title text style of `fontFaceID=2` and `fontSize=19.025`, whereas
- *   MacOS has title text style of `fontFaceID=2` and `fontSize=18.96`.
- *
- */
-const isRiskTitle = textObj => {
-  // determine if is text title via text style.
-  const [fontFaceID, fontSize] = extractTextStyle(textObj)
-
-  const { currentOs, parseStyle } = pandaRiskConfg
-
-  const { riskTitleStyle } = parseStyle[currentOs]
-
-  return fontFaceID === riskTitleStyle.fontFaceID && fontSize === riskTitleStyle.fontSize
-}
-
-const isHeaderTitle = textObj => {
-  const [fontFaceID, fontSize] = extractTextStyle(textObj)
-
-  const { currentOs, parseStyle } = pandaRiskConfg
-
-  const { headerTitleStyle } = parseStyle[currentOs]
-
-  return fontFaceID === headerTitleStyle.fontFaceID && fontSize === headerTitleStyle.fontSize
-}
 
 /**
  * Tag the line number for each rusk rule. The return format is:
@@ -193,11 +160,11 @@ function parseHeaderContentToTitleList(content) {
     .split('|')
     .filter(title => !!title)
     .map(title => {
-      const [, ref,,, ctrl_name] = HEADER_TITLE_SEP_REG.exec(title)
+      const [, ref,,, ctrlName] = HEADER_TITLE_SEP_REG.exec(title)
 
       return {
         ref,
-        ctrl_name,
+        ctrl_name: ctrlName,
       }
     })
 
