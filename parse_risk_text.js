@@ -7,7 +7,11 @@ const {
   composeContentFromTextChunks,
   removePDFPageText,
 } = require('./util')
-const config = require('./pandarisk.config')
+const { win10CommandsFormatter } = require('./win10_util')
+const {
+  osTypes,
+  config,
+} = require('./pandarisk.config')
 
 // This function extracts the information we need from risk chunk.
 // It analyzes the text chunks for each risk and try to parse the following
@@ -56,11 +60,7 @@ function parseRiskText(textObj) {
 
   // The start of "Audit" is the end position of "Rationale".
   const auditChunks = rationaleChunks.slice(rationaleInfo.rel_end_pos+1)
-
-  //console.log('DEBUG auditInfo', composeContentFromTextChunks(auditChunks))
-
   const auditInfo = extractAuditInfo(auditChunks)
-
 
   // The start of "Remediation" is the end position of "Audit".
   const remediationChunks = auditChunks.slice(auditInfo.rel_end_pos+1)
@@ -86,10 +86,10 @@ function parseRiskText(textObj) {
 }
 
 const PASS_SCORE_REGEX = /Level%20(\d+).*$/
-const REMEDIATION_REGEX = /^R?emediation?(%3A)?$/
 const IMPACT_REGEX = /^Impact%3A$/
 const COLON_DELIMITER_REGEX = /^.*%3A$/
 const NOTE_SUBTITLE_REGEX =  /^Note(%20%23\d)?%3A$/
+const IMPORTANT_SUBTITLE_REGEX = /^Important?%3A$/
 
 /**
  * We are using /^.*%3A$/ to find the end position for each subtitle segment.
@@ -104,9 +104,12 @@ const NOTE_SUBTITLE_REGEX =  /^Note(%20%23\d)?%3A$/
  */
 const exceptionSubtitleRegs = [
   NOTE_SUBTITLE_REGEX,
+  IMPORTANT_SUBTITLE_REGEX,
 ]
 
-const shouldOmitSubtitle = subtitle => exceptionSubtitleRegs.some(regex => regex.test(subtitle))
+const shouldOmitSubtitle = subtitle => exceptionSubtitleRegs.some(
+  regex => regex.test(subtitle)
+)
 
 
 function extractProfileApplicability(textChunks) {
@@ -231,6 +234,10 @@ function extractAuditInfo(textChunks) {
     const isDeliminator = COLON_DELIMITER_REGEX.test(extractText(textChunks[i]))
 
     if (isDeliminator && isSubTitleStyle(textChunks[i])) {
+      const shouldOmit = shouldOmitSubtitle(extractText(textChunks[i]))
+
+      if (shouldOmit) continue;
+
       endPos = i - 1
 
       break
@@ -240,7 +247,18 @@ function extractAuditInfo(textChunks) {
   const auditChunks = textChunks.slice(1, endPos + 1)
 
   // Try parse "command" and "result" from the edit chunks.
-  const commands = parseCommandFromAuditTexts(auditChunks)
+  let commands = parseCommandFromAuditTexts(auditChunks)
+
+  // filter the empty command string.
+  commands = commands.filter(cmd => !!cmd)
+
+  // If we are parsing `Microsoft Windows 10` command,
+  // We need to reformat the command so that powershell
+  // can run it properly. The original command stated on
+  // the PDF document is not the right format.
+  if (osTypes.MS_WIN_10) {
+    commands = win10CommandsFormatter(commands)
+  }
 
   return {
     rel_end_pos: endPos,

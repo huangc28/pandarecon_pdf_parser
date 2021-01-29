@@ -19,10 +19,12 @@ const outputFilenames = {
 }
 
 const config = {
-  //filePath: './data_source/CIS_Microsoft_Windows_8.1_Workstation_Benchmark_v2.4.0_risk_only.json',
-  filePath: './data_source/macOS_risk_only.json',
 
-  currentOs: osTypes.MAC_OS,
+  //filePath: './data_source/CIS_Microsoft_Windows_8.1_Workstation_Benchmark_v2.4.0_risk_only.json',
+  //filePath: './data_source/macOS_risk_only.json',
+  filePath: './data_source/CIS_Microsoft_Windows_10_Enterprise_Release_1909_Benchmark_v1.8.1_risk_only.json',
+
+  currentOs: osTypes.MS_WIN_10,
 
   currentGroup: null,
 
@@ -101,4 +103,7 @@ const config = {
 config.currentGroup = controlGroups[config.currentOs]
 config.outputFilename = outputFilenames[config.currentOs]
 
-module.exports = config;
+module.exports = {
+  osTypes,
+  config,
+}

@@ -13,19 +13,9 @@
 // Each "Page" element has a "Text" element which contains the literature for each rule. We'll need to recognize the rule title using text style or regular expression.
 // The expected structure of a ranged chunks are to be like:
 //
-// {
-//   "1.1 Verify all Apple provided software is current (Scored):" {
-//     text: [
-//       ...pdf2json page objects...
-//     ]
-//   },
-//
-//   "1.2 Enable Auto Update (Scored)": {
-//     text: [
-//       ...pdf2json page objects...,
-//     ]
-//   }
-// }
+// - 1.1 is within the range from array index 0 ~ 10.
+// - 1.2 is within the range from array index 11 ~ 20.
+// - 1.3 is within the range from array index 21 ~ 30.
 //
 const fs = require('fs')
 const path = require('path')
@@ -34,7 +24,7 @@ const JSONStream = require('JSONStream')
 const { composeContentFromTextChunks } = require('./util')
 const riskRangeTags = require('./get_risk_range_tags')
 const parseRiskText = require('./parse_risk_text')
-const pandaRiskConf = require('./pandarisk.config')
+const pandaRiskConf = require('./pandarisk.config').config
 const { isRiskTitle } = require('./text_matchers')
 const { extractText } = require('./extractors')
 
@@ -134,7 +124,7 @@ const handleData = chunk => {
   } = riskRangeTags(mergedTitleText)
 
 
-  //const s = titleList.find(tag => tag.ref === '18.9.11.2.1')
+  //const s = titleList.find(tag => tag.ref === '2.3.2.1')
 
   //console.log('DEBUG 1', s)
 
@@ -145,6 +135,7 @@ const handleData = chunk => {
   //const obj = parseRiskText(s)
 
   //console.log('DEBUG 2', obj)
+  //console.log('DEBUG 3', composeContentFromTextChunks(obj))
 
   const riskInfoObjs = titleList.map(chunk => parseRiskText(chunk))
   const masterInfo = headerList.concat(riskInfoObjs)

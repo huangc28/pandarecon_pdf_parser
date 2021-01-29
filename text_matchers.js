@@ -1,5 +1,5 @@
 const { extractTextStyle } = require('./extractors')
-const pandaRiskConfg = require('./pandarisk.config')
+const pandaRiskConfg = require('./pandarisk.config').config
 
 const { currentOs, parseStyle } = pandaRiskConfg
 const {
