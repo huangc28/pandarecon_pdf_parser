@@ -124,9 +124,7 @@ const handleData = chunk => {
   } = riskRangeTags(mergedTitleText)
 
 
-  //const s = titleList.find(tag => tag.ref === '2.3.2.1')
-
-  //console.log('DEBUG 1', s)
+  //const s = titleList.find(tag => tag.ref === '1.6.2')
 
   //const content = composeContentFromTextChunks(s.text_chunks)
 
@@ -139,6 +137,7 @@ const handleData = chunk => {
 
   const riskInfoObjs = titleList.map(chunk => parseRiskText(chunk))
   const masterInfo = headerList.concat(riskInfoObjs)
+  console.log('DEBUG 4', masterInfo)
 
   const { outputFilename } = pandaRiskConf
 

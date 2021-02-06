@@ -8,6 +8,7 @@ const {
   removePDFPageText,
 } = require('./util')
 const { win10CommandsFormatter } = require('./win10_util')
+const { msOfficeWord2016CommandsFormatter } = require('./ms_office_2016_util')
 const {
   osTypes,
   config,
@@ -253,11 +254,19 @@ function extractAuditInfo(textChunks) {
   commands = commands.filter(cmd => !!cmd)
 
   // If we are parsing `Microsoft Windows 10` command,
-  // We need to reformat the command so that powershell
+  // We need to reformat the command so that the powershell
   // can run it properly. The original command stated on
   // the PDF document is not the right format.
   if (osTypes.MS_WIN_10) {
     commands = win10CommandsFormatter(commands)
+  }
+
+
+  // If we are parsing `Microsoft offce 2016` command,
+  // We need to reformat the command so that the powershell
+  // can run it properly.
+  if (osTypes.MS_OFFICE_WORD_2016) {
+    commands = msOfficeWord2016CommandsFormatter(commands)
   }
 
   return {
@@ -289,6 +298,7 @@ function parseCommandFromAuditTexts(auditChunks) {
 
   for (let i = 0; i < auditChunks.length; i++) {
     if (isCommandBlockStyle(auditChunks[i])) {
+
       if (foundAt === null || i - foundAt === 1) {
         commandCodeTexts.push(auditChunks[i])
 
