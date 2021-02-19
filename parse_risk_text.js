@@ -1,4 +1,4 @@
-const { extractText, extractTextStyle } = require('./extractors')
+const { extractText } = require('./extractors')
 const {
   isCommandBlockStyle,
   isSubTitleStyle,
@@ -7,8 +7,12 @@ const {
   composeContentFromTextChunks,
   removePDFPageText,
 } = require('./util')
-const { win10CommandsFormatter } = require('./win10_util')
-const { msOfficeWord2016CommandsFormatter } = require('./ms_office_2016_util')
+const {
+  win10CommandsFormatter,
+  msOfficeWord2016CommandsFormatter,
+  msWin10Server2012CommandsFormatter,
+} = require('./command_formatters')
+
 const {
   osTypes,
   config,
@@ -90,6 +94,7 @@ const PASS_SCORE_REGEX = /Level%20(\d+).*$/
 const IMPACT_REGEX = /^Impact%3A$/
 const COLON_DELIMITER_REGEX = /^.*%3A$/
 const NOTE_SUBTITLE_REGEX =  /^Note(%20%23\d)?%3A$/
+const CAUTION_SUBTITLE_REGEX = /^Caution%3A$/
 const IMPORTANT_SUBTITLE_REGEX = /^Important?%3A$/
 
 /**
@@ -106,6 +111,7 @@ const IMPORTANT_SUBTITLE_REGEX = /^Important?%3A$/
 const exceptionSubtitleRegs = [
   NOTE_SUBTITLE_REGEX,
   IMPORTANT_SUBTITLE_REGEX,
+  CAUTION_SUBTITLE_REGEX,
 ]
 
 const shouldOmitSubtitle = subtitle => exceptionSubtitleRegs.some(
@@ -176,8 +182,8 @@ function extractProfileApplicability(textChunks) {
   }
 }
 
+// Find text range before "Rationale:"
 function extractDescInfo(textChunks) {
-  // Find text range before "Rationale:"
   let endPos = 0
   for (let i = 1; i < textChunks.length; i++) {
     const isDeliminator = COLON_DELIMITER_REGEX.test(extractText(textChunks[i]))
@@ -185,7 +191,7 @@ function extractDescInfo(textChunks) {
     if (isDeliminator && isSubTitleStyle(textChunks[i])) {
       const shouldOmit = shouldOmitSubtitle(extractText(textChunks[i]))
 
-      if (shouldOmit) continue;
+      if (shouldOmit) continue
 
       endPos = i - 1
 
@@ -257,15 +263,21 @@ function extractAuditInfo(textChunks) {
   // We need to reformat the command so that the powershell
   // can run it properly. The original command stated on
   // the PDF document is not the right format.
-  if (osTypes.MS_WIN_10) {
+  if (
+    config.currentOs === osTypes.MS_WIN_10 ||
+    config.currentOs === osTypes.MS_WIN_7_WORKSTATION_BENCHMARK_3_2_0_END_OF_LIFE
+  ) {
     commands = win10CommandsFormatter(commands)
   }
 
+  if (config.currentOs === osTypes.MS_WIN_SERVER_2012_R2) {
+    commands = msWin10Server2012CommandsFormatter(commands)
+  }
 
   // If we are parsing `Microsoft offce 2016` command,
   // We need to reformat the command so that the powershell
   // can run it properly.
-  if (osTypes.MS_OFFICE_WORD_2016) {
+  if (config.currentOs === osTypes.MS_OFFICE_WORD_2016) {
     commands = msOfficeWord2016CommandsFormatter(commands)
   }
 
@@ -338,6 +350,10 @@ function extractRemediation(textChunks) {
 
   for (let i = 0; i < textChunks.length; i++) {
     if (IMPACT_REGEX.test(extractText(textChunks[i]))) {
+      const shouldOmit = shouldOmitSubtitle(extractText(textChunks[i]))
+
+      if (shouldOmit) continue
+
       endPos = i - 1
 
       break

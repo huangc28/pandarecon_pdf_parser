@@ -21,7 +21,7 @@ const fs = require('fs')
 const path = require('path')
 const JSONStream = require('JSONStream')
 
-const { composeContentFromTextChunks } = require('./util')
+//const { composeContentFromTextChunks } = require('./util')
 const riskRangeTags = require('./get_risk_range_tags')
 const parseRiskText = require('./parse_risk_text')
 const pandaRiskConf = require('./pandarisk.config').config
@@ -123,8 +123,7 @@ const handleData = chunk => {
     titleList,
   } = riskRangeTags(mergedTitleText)
 
-
-  //const s = titleList.find(tag => tag.ref === '1.6.2')
+  //const s = titleList.find(tag => tag.ref === '18.9.26.1.1')
 
   //const content = composeContentFromTextChunks(s.text_chunks)
 
@@ -135,23 +134,24 @@ const handleData = chunk => {
   //console.log('DEBUG 2', obj)
   //console.log('DEBUG 3', composeContentFromTextChunks(obj))
 
-  const riskInfoObjs = titleList.map(chunk => parseRiskText(chunk))
-  const masterInfo = headerList.concat(riskInfoObjs)
-  console.log('DEBUG 4', masterInfo)
+   const riskInfoObjs = titleList.map(chunk => parseRiskText(chunk))
+   const masterInfo = headerList.concat(riskInfoObjs)
 
-  const { outputFilename } = pandaRiskConf
+  //console.log('DEBUG 4', masterInfo)
 
-  fs.writeFile(
-    path.resolve(__dirname, outputFilename),
-    JSON.stringify(masterInfo) ,
-    err => {
-      if (err) {
-          throw err;
-      }
+   const { outputFilename } = pandaRiskConf
 
-      console.error("JSON data is saved.");
-    }
-  )
+   fs.writeFile(
+     path.resolve(__dirname, outputFilename),
+     JSON.stringify(masterInfo) ,
+     err => {
+       if (err) {
+           throw err;
+       }
+
+       console.error("JSON data is saved.");
+     }
+   )
 }
 
 const getTextElems = pages =>

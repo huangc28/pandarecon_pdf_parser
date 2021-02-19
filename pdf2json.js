@@ -8,13 +8,17 @@ const PDFParser = require('pdf2json');
 //const fileName = './source_pdfs/CIS_Apple_macOS_risk_only.pdf';
 //const fileName = 'CIS_Microsoft_Windows_10_Enterprise_Release_1909_Benchmark_v1.8.1_risk_only.pdf';
 //const fileName = './source_pdfs/CIS_Microsoft_Windows_8.1_Workstation_Benchmark_v2.4.0_risk_only.pdf'
-const fileName = './source_pdfs/CIS_Microsoft_Office_Word_2016_Benchmark_v1.1.0_risk_only.pdf'
+//const fileName = './source_pdfs/CIS_Microsoft_Office_Word_2016_Benchmark_v1.1.0_risk_only.pdf'
+//const fileName = './source_pdfs/CIS_Microsoft_Windows_Server_2012_R2_Benchmark_v2.4.0_risk_only.pdf'
+const fileName = './source_pdfs/CIS_Microsoft_Windows_7_Workstation_Benchmark_v3.2.0 - End of Life.risk_only.pdf'
 
 //const targetFileName = './macOS_master.json'
 //const targetFileName = './data_source/macOS_risk_only.json'
 //const targetFileName = './CIS_Microsoft_Windows_10_Enterprise_Release_1909_Benchmark_v1.8.1_risk_only.json'
 //const targetFileName = './data_source/CIS_Microsoft_Windows_8.1_Workstation_Benchmark_v2.4.0_risk_only.json'
-const targetFileName = './data_source/CIS_Microsoft_Office_Word_2016_Benchmark_v1.1.0_risk_only.json'
+//const targetFileName = './data_source/CIS_Microsoft_Office_Word_2016_Benchmark_v1.1.0_risk_only.json'
+//const targetFileName = './data_source/CIS_Microsoft_Windows_Server_2012_R2_Benchmark_v2.4.0_risk_only.json'
+const targetFileName = './data_source/CIS_Microsoft_Windows_7_Workstation_Benchmark_v3.2.0 - End of Life.risk_only.json'
 
 function StringifyStream() {
      stream.Transform.call(this);

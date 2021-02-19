@@ -5,8 +5,8 @@ const {
   isRiskTitle,
   isHeaderTitle,
 } = require('./text_matchers')
-
 const { composeContentFromTextChunks } = require('./util')
+const { config } = require('./pandarisk.config')
 
 /**
  * Tag the line number for each rusk rule. The return format is:
@@ -39,14 +39,12 @@ function riskRangeTags(texts) {
   const headerContent = composeContentFromTextChunks(headerChunks)
   const headerList = parseHeaderContentToTitleList(headerContent)
 
-  // Since headers have different text style and matching pattern
-  // than risk title, it's not possible to keep them in order.
-  // Just simply concat them.
-
-  //console.log('DEBUG 1', titleList)
-
   return {
-    headerList,
+    headerList: headerList.map(header => ({
+      ...header,
+      control_group: config.currentGroup,
+      control_type: config.currentOs,
+    })),
     titleList: setRiskChunkRange(titleList, texts),
   }
 }
@@ -163,8 +161,8 @@ function parseHeaderContentToTitleList(content) {
       const [, ref,,, ctrlName] = HEADER_TITLE_SEP_REG.exec(title)
 
       return {
-        ref,
-        ctrl_name: ctrlName,
+        control_ref: ref,
+        control_name: ctrlName,
       }
     })
 
