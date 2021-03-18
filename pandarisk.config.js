@@ -28,9 +28,9 @@ const outputFilenames = {
 }
 
 const config = {
-  filePath: './data_source/CIS_Microsoft_Windows_7_Workstation_Benchmark_v3.2.0 - End of Life.risk_only.json',
+  filePath: './data_source/CIS_Microsoft_Windows_10_Enterprise_Release_1909_Benchmark_v1.8.1_risk_only.json',
 
-  currentOs: osTypes.MS_WIN_7_WORKSTATION_BENCHMARK_3_2_0_END_OF_LIFE,
+  currentOs: osTypes.MS_WIN_10,
 
   currentGroup: null,
 

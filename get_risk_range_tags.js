@@ -161,8 +161,8 @@ function parseHeaderContentToTitleList(content) {
       const [, ref,,, ctrlName] = HEADER_TITLE_SEP_REG.exec(title)
 
       return {
-        control_ref: ref,
-        control_name: ctrlName,
+        control_ref: decodeURIComponent(ref),
+        control_name: decodeURIComponent(ctrlName).trim(),
       }
     })
 

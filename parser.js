@@ -21,11 +21,11 @@ const fs = require('fs')
 const path = require('path')
 const JSONStream = require('JSONStream')
 
-//const { composeContentFromTextChunks } = require('./util')
 const riskRangeTags = require('./get_risk_range_tags')
 const parseRiskText = require('./parse_risk_text')
+const parseHeaderText = require('./parse_header_text')
 const pandaRiskConf = require('./pandarisk.config').config
-const { isRiskTitle } = require('./text_matchers')
+const { isRiskTitle, isHeaderTitle } = require('./text_matchers')
 const { extractText } = require('./extractors')
 
 const read = fileName => {
@@ -108,50 +108,85 @@ const mergeTitleChunks = chunks => {
   return titleList
 };
 
+const mergeHeaderChunks = chunks => {
+  const traceHeaderChunks = (chunks, at) => {
+    if (isHeaderTitle(chunks[at + 1])) {
+      return traceHeaderChunks(chunks, at + 1)
+    }
+
+    return at
+  }
+
+  const mergeChunksText = chunks => {
+    return chunks
+      .reduce(
+        (accu, chunk) => {
+          accu += extractText(chunk)
+
+          return accu
+        },
+        '',
+      )
+  }
+
+  const titleList = []
+
+  // Iterate through each chunk. Try to find title chunk in the list.
+  // If we find a title chunk, there will be a great chance where the next
+  // text chunk is title chunk either.
+  let i = 0
+
+  while (i < chunks.length) {
+    if (isHeaderTitle(chunks[i])) {
+      const endRef = traceHeaderChunks(chunks, i)
+
+      // Now we found the last text chunk of the current title
+      // merge them all together
+      const partialTitleChunks = chunks.slice(i, endRef + 1)
+      const mergedText = mergeChunksText(partialTitleChunks)
+
+      chunks[i]['R'][0]['T'] = mergedText
+      titleList.push(chunks[i])
+
+      i += (endRef - i) + 1
+    } else {
+      titleList.push(chunks[i])
+
+      i++
+    }
+  }
+
+  return titleList
+};
+
 const handleData = chunk => {
   // Retrieve config object
-  const fullTexts = getTextElems(chunk.Pages)
+  let fullTexts = getTextElems(chunk.Pages)
 
-  const mergedTitleText = mergeTitleChunks(fullTexts)
-
-  //const s = mergedTitleText.find(tag => tag.ref === '18.9.95.1')
-
-  //console.log('DEBUG s', mergedTitleText)
+  fullTexts = mergeTitleChunks(fullTexts)
+  fullTexts = mergeHeaderChunks(fullTexts)
 
   const {
     headerList,
     titleList,
-  } = riskRangeTags(mergedTitleText)
+  } = riskRangeTags(fullTexts)
 
-  //const s = titleList.find(tag => tag.ref === '18.9.26.1.1')
+  const parsedHeaderList = parseHeaderText(headerList, fullTexts)
+  const riskInfoObjs = titleList.map(chunk => parseRiskText(chunk))
+  const masterInfo = parsedHeaderList.concat(riskInfoObjs)
+  const { outputFilename } = pandaRiskConf
 
-  //const content = composeContentFromTextChunks(s.text_chunks)
+  fs.writeFile(
+    path.resolve(__dirname, outputFilename),
+    JSON.stringify(masterInfo) ,
+    err => {
+      if (err) {
+          throw err;
+      }
 
-  //console.log('DEBUG 3', content)
-
-  //const obj = parseRiskText(s)
-
-  //console.log('DEBUG 2', obj)
-  //console.log('DEBUG 3', composeContentFromTextChunks(obj))
-
-   const riskInfoObjs = titleList.map(chunk => parseRiskText(chunk))
-   const masterInfo = headerList.concat(riskInfoObjs)
-
-  //console.log('DEBUG 4', masterInfo)
-
-   const { outputFilename } = pandaRiskConf
-
-   fs.writeFile(
-     path.resolve(__dirname, outputFilename),
-     JSON.stringify(masterInfo) ,
-     err => {
-       if (err) {
-           throw err;
-       }
-
-       console.error("JSON data is saved.");
-     }
-   )
+      console.error("JSON data is saved.");
+    }
+  )
 }
 
 const getTextElems = pages =>

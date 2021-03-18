@@ -5,6 +5,7 @@ const { config, osTypes } = require('./pandarisk.config')
 const sourcePath = config.outputFilename
 
 const targetPaths = {
+  [osTypes.MS_WIN_10]: './result_csvs/win10_1909_data_seeder.csv',
   [osTypes.MS_WIN_8_1_WORKSTATION]: './result_csvs/ms_8.1_workstation_data_seeder.csv',
   [osTypes.MS_OFFICE_WORD_2016]: './result_csvs/ms_office_word_2016_data_seeder.csv',
   [osTypes.MS_WIN_SERVER_2012_R2]: './result_csvs/ms_win_server_2012_r2_seeder.csv',
