@@ -27,6 +27,18 @@ const parseHeaderText = require('./parse_header_text')
 const pandaRiskConf = require('./pandarisk.config').config
 const { isRiskTitle, isHeaderTitle } = require('./text_matchers')
 const { extractText } = require('./extractors')
+const { Command } = require('commander')
+
+const cmd = new Command()
+
+cmd
+  .requiredOption('-f, --file <filePath>', 'specify PDF json path to extract the data from')
+  .parse(process.argv)
+  .action(parsePDFJson)
+
+function parsePDFJson () {
+
+}
 
 const read = fileName => {
   const s = fs.createReadStream(fileName, { encoding: 'utf8' })
