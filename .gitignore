@@ -6,3 +6,5 @@ pdf2json
 
 *.pdf
 *.json
+
+result_csvs/*
